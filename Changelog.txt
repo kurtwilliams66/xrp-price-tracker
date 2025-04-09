@@ -1,0 +1,15 @@
+## [1.2.0] - 2025-04-09 - "GlassPanel UI"
+
+### Added
+- New modern interface inspired by Apple Stocks layout
+- Live chart view with PyQtGraph, tooltips, and animated line
+- Custom interval buttons [1D - ALL] with active state
+- Realtime update label showing "Last Updated: HH:MM"
+- Data stats footer with Open/High/Low/Vol/Mkt Cap etc.
+- Styling via QSS: rounded corners, smooth hover, SF-style fonts
+
+### Fixed
+- Resolved CoinGecko API lookup bug for `'ripple'` → `'ripple'` replaced with `'ripple' or 'xrp' fallback`
+- Error log now shows Coin name if lookup fails
+
+
