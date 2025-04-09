@@ -1,9 +1,28 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
 import pyqtgraph as pg
 from datetime import datetime
-from services.price_fetcher import get_price_history
+from services.price_fetcher import get_price_history, get_xrp_price
+
+
+class PriceFetcherThread(QThread):
+    # Define a signal to communicate with the main thread
+    price_updated = pyqtSignal(float)
+    history_updated = pyqtSignal(list)
+
+    def run(self):
+        # Fetch the current price and history
+        try:
+            price = get_xrp_price()
+            if price:
+                self.price_updated.emit(price)
+
+            # Here, we assume 'get_price_history' returns a list of (timestamp, price) tuples
+            data = get_price_history('1D')  # Default range is '1D'
+            self.history_updated.emit(data)
+        except Exception as e:
+            print("[ERROR] Fetching data failed:", str(e))
 
 
 class MainWindow(QWidget):
@@ -14,7 +33,14 @@ class MainWindow(QWidget):
 
         self.init_ui()
         self.apply_dark_theme()
-        self.change_range("1D")  # Default chart range
+
+        # Thread to handle background work
+        self.price_thread = PriceFetcherThread()
+        self.price_thread.price_updated.connect(self.update_price_ui)
+        self.price_thread.history_updated.connect(self.update_chart_ui)
+        self.price_thread.start()  # Start the thread to fetch data
+
+        self.price_history = []  # Initialize price history for the chart
 
     def init_ui(self):
         # Price Display Label
@@ -70,6 +96,11 @@ class MainWindow(QWidget):
 
         self.setLayout(layout)
 
+        # Timer for periodic price updates
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.fetch_new_price)
+        self.timer.start(15000)  # Update every 15 seconds
+
     def apply_dark_theme(self):
         self.setStyleSheet("""
             QWidget {
@@ -95,6 +126,23 @@ class MainWindow(QWidget):
                 border: 1px solid #333;
             }
         """)
+
+    def update_price_ui(self, price):
+        """Update the UI with the current price."""
+        self.price_label.setText(f"XRP Price: ${price:.4f}")
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.time_label.setText(f"Last Updated: {current_time}")
+
+    def update_chart_ui(self, data):
+        """Update the chart with the fetched historical data."""
+        if data:
+            timestamps, prices = zip(*data)
+            self.price_curve.setData(x=list(range(len(prices))), y=prices)
+            self.api_info_label.setText("Showing 1D data from CryptoCompare API")
+
+    def fetch_new_price(self):
+        """Fetch the latest price and history data."""
+        self.price_thread.start()  # Start the thread to fetch new data
 
     def change_range(self, range_label):
         """
